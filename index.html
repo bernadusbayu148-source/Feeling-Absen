@@ -3,30 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Absensi Digital</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Absensi Kopi Feeling</title>
+    <style>
+        /* --- Tema Kopi Feeling --- */
+        :root {
+            --bg-color: #F5EFEB; /* Krem hangat / busa kopi */
+            --card-bg: #FFFFFF;
+            --text-main: #3E2723; /* Cokelat kopi pekat */
+            --accent-red: #D32F2F; /* Merah senada dengan logo */
+            --accent-hover: #B71C1C;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 450px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(62, 39, 35, 0.1);
+            overflow: hidden;
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .header img {
+            width: 100px;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--text-main);
+            letter-spacing: 1px;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            color: #795548;
+            margin-top: 5px;
+            margin-bottom: 20px;
+        }
+
+        .camera-container {
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            background-color: #000;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        #video {
+            width: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
+        .info-panel {
+            background-color: #EFEBE9;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: left;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .info-panel span {
+            font-weight: bold;
+            color: var(--accent-red);
+        }
+
+        button {
+            background-color: var(--accent-red);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s ease;
+            box-shadow: 0 4px 6px rgba(211, 47, 47, 0.3);
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .result-container {
+            margin-top: 25px;
+            display: none; /* Disembunyikan sampai foto diambil */
+            animation: fadeIn 0.5s;
+        }
+
+        .result-container h3 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        #photo {
+            width: 100%;
+            border-radius: 15px;
+            border: 2px solid var(--accent-red);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
 <body>
+
     <div class="container">
-        <h2>Absensi Kehadiran</h2>
-        
-        <!-- Preview Kamera -->
-        <video id="video" width="100%" autoplay playsinline></video>
-        <canvas id="canvas" style="display:none;"></canvas>
-        
-        <div class="info-section">
-            <p id="status-lokasi">Mencari lokasi...</p>
-            <p id="timestamp"></p>
+        <div class="header">
+            <img src="logo-header.png" alt="Logo Kopi Feeling" id="source-logo">
+            <h2>Absensi Kopi Feeling</h2>
+            <p>Awali harimu dengan senyuman dan kopi</p>
         </div>
 
-        <button id="snap">Ambil Foto & Absen</button>
-        
-        <div id="result" class="result-container">
-            <h3>Hasil Absensi:</h3>
-            <img id="photo" src="" alt="Foto Absen">
-            <pre id="log-data"></pre>
+        <div class="camera-container">
+            <video id="video" autoplay playsinline></video>
+        </div>
+
+        <div class="info-panel">
+            <div>📍 Lokasi: <span id="lokasi-text">Mencari titik GPS...</span></div>
+            <div>⏰ Waktu: <span id="waktu-text">-</span></div>
+        </div>
+
+        <button id="snap-btn" disabled>Ambil Foto & Absen</button>
+
+        <div class="result-container" id="result-container">
+            <h3>Bukti Kehadiran Anda:</h3>
+            <img id="photo" src="" alt="Hasil Absen">
+            <p style="font-size: 0.8rem; color: #795548; margin-top: 10px;">
+                Foto di atas sudah diberi watermark logo, waktu, dan lokasi.
+            </p>
         </div>
     </div>
-    <script src="script.js"></script>
+
+    <script>
+        const video = document.getElementById('video');
+        const snapBtn = document.getElementById('snap-btn');
+        const lokasiText = document.getElementById('lokasi-text');
+        const waktuText = document.getElementById('waktu-text');
+        const resultContainer = document.getElementById('result-container');
+        const photoDisplay = document.getElementById('photo');
+        const sourceLogo = document.getElementById('source-logo');
+        
+        let currentLat = "-";
+        let currentLon = "-";
+
+        // 1. Update Waktu Real-time
+        function updateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            waktuText.innerText = now.toLocaleDateString('id-ID', options);
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // 2. Akses Kamera
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Kamera error:", err);
+                alert("Tidak dapat mengakses kamera. Pastikan Anda memberikan izin.");
+            });
+
+        // 3. Ambil Lokasi GPS
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    currentLat = position.coords.latitude.toFixed(6);
+                    currentLon = position.coords.longitude.toFixed(6);
+                    lokasiText.innerText = `${currentLat}, ${currentLon}`;
+                    snapBtn.disabled = false; // Aktifkan tombol jika lokasi sudah dapat
+                },
+                (error) => {
+                    lokasiText.innerText = "Gagal mengambil lokasi. Aktifkan GPS.";
+                    snapBtn.disabled = false; // Tetap aktifkan agar user bisa absen meski tanpa GPS yang akurat
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        }
+
+        // 4. Proses Ambil Foto & Watermark
+        snapBtn.addEventListener('click', () => {
+            // Buat canvas virtual untuk menggambar
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Sesuaikan ukuran canvas dengan resolusi asli video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Gambar frame dari video ke canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Menambahkan overlay hitam transparan di bagian bawah untuk teks
+            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
+
+            // Menambahkan Teks Waktu dan Lokasi ke dalam foto
+            ctx.fillStyle = "white";
+            ctx.font = "bold 16px Arial";
+            const timeString = `Waktu: ${waktuText.innerText}`;
+            const locString = `Lokasi: ${currentLat}, ${currentLon}`;
+            ctx.fillText(timeString, 15, canvas.height - 45);
+            ctx.fillText(locString, 15, canvas.height - 20);
+
+            // Menambahkan Logo ke dalam foto (Pojok Kanan Bawah)
+            // Pastikan logo sudah ter-load (menggunakan elemen img dari header)
+            const logoTargetWidth = 80; // Lebar logo di dalam foto
+            const aspectRatio = sourceLogo.naturalWidth / sourceLogo.naturalHeight;
+            const logoTargetHeight = logoTargetWidth / aspectRatio;
+            
+            const logoX = canvas.width - logoTargetWidth - 15;
+            const logoY = canvas.height - logoTargetHeight - 15;
+            
+            ctx.drawImage(sourceLogo, logoX, logoY, logoTargetWidth, logoTargetHeight);
+
+            // Konversi canvas menjadi gambar data base64
+            const finalImageUrl = canvas.toDataURL('image/png');
+
+            // Tampilkan hasil
+            photoDisplay.src = finalImageUrl;
+            resultContainer.style.display = 'block';
+
+            // Opsional: Gulir layar ke bawah untuk melihat hasil
+            resultContainer.scrollIntoView({ behavior: 'smooth' });
+        });
+    </script>
 </body>
 </html>
