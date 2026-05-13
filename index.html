@@ -7,10 +7,10 @@
     <style>
         /* --- Tema Kopi Feeling --- */
         :root {
-            --bg-color: #F5EFEB; /* Krem hangat / busa kopi */
+            --bg-color: #F5EFEB; 
             --card-bg: #FFFFFF;
-            --text-main: #3E2723; /* Cokelat kopi pekat */
-            --accent-red: #D32F2F; /* Merah senada dengan logo */
+            --text-main: #3E2723; 
+            --accent-red: #D32F2F; 
             --accent-hover: #B71C1C;
         }
 
@@ -37,10 +37,15 @@
             padding: 30px 20px;
         }
 
+        /* Perbaikan 1: Latar belakang khusus untuk logo agar teks putih terlihat */
         .header img {
             width: 100px;
             height: auto;
             margin-bottom: 10px;
+            background-color: var(--text-main); /* Latar cokelat gelap */
+            padding: 15px;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
         .header h2 {
@@ -48,6 +53,7 @@
             font-size: 1.5rem;
             color: var(--text-main);
             letter-spacing: 1px;
+            margin-top: 10px;
         }
 
         .header p {
@@ -57,19 +63,22 @@
             margin-bottom: 20px;
         }
 
+        /* Perbaikan 3: Menghilangkan bar hitam dengan mengunci rasio */
         .camera-container {
             position: relative;
             border-radius: 15px;
             overflow: hidden;
-            background-color: #000;
             margin-bottom: 15px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            aspect-ratio: 3/4; /* Memaksa bentuk potret */
+            width: 100%;
         }
 
         #video {
             width: 100%;
+            height: 100%;
             display: block;
-            object-fit: cover;
+            object-fit: cover; /* Membuat video memenuhi kontainer tanpa distorsi */
         }
 
         .info-panel {
@@ -113,7 +122,7 @@
 
         .result-container {
             margin-top: 25px;
-            display: none; /* Disembunyikan sampai foto diambil */
+            display: none; 
             animation: fadeIn 0.5s;
         }
 
@@ -137,29 +146,31 @@
 <body>
 
     <div class="container">
+        <!-- Header -->
         <div class="header">
             <img src="logo-header.png" alt="Logo Kopi Feeling" id="source-logo">
             <h2>Absensi Kopi Feeling</h2>
             <p>Awali harimu dengan senyuman dan kopi</p>
         </div>
 
+        <!-- Kamera -->
         <div class="camera-container">
             <video id="video" autoplay playsinline></video>
         </div>
 
+        <!-- Info Real-time -->
         <div class="info-panel">
             <div>📍 Lokasi: <span id="lokasi-text">Mencari titik GPS...</span></div>
-            <div>⏰ Waktu: <span id="waktu-text">-</span></div>
+            <div style="margin-top: 5px;">⏰ Waktu: <span id="waktu-text">-</span></div>
         </div>
 
+        <!-- Tombol Aksi -->
         <button id="snap-btn" disabled>Ambil Foto & Absen</button>
 
+        <!-- Hasil -->
         <div class="result-container" id="result-container">
             <h3>Bukti Kehadiran Anda:</h3>
             <img id="photo" src="" alt="Hasil Absen">
-            <p style="font-size: 0.8rem; color: #795548; margin-top: 10px;">
-                Foto di atas sudah diberi watermark logo, waktu, dan lokasi.
-            </p>
         </div>
     </div>
 
@@ -174,6 +185,8 @@
         
         let currentLat = "-";
         let currentLon = "-";
+        let namaLokasi = "Mencari detail alamat...";
+        let hasFetchedAddress = false;
 
         // 1. Update Waktu Real-time
         function updateTime() {
@@ -191,29 +204,54 @@
             })
             .catch(err => {
                 console.error("Kamera error:", err);
-                alert("Tidak dapat mengakses kamera. Pastikan Anda memberikan izin.");
+                alert("Tidak dapat mengakses kamera.");
             });
 
-        // 3. Ambil Lokasi GPS
+        // 3. Ambil Lokasi GPS & Reverse Geocoding (Perbaikan 2)
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
                     currentLat = position.coords.latitude.toFixed(6);
                     currentLon = position.coords.longitude.toFixed(6);
-                    lokasiText.innerText = `${currentLat}, ${currentLon}`;
-                    snapBtn.disabled = false; // Aktifkan tombol jika lokasi sudah dapat
+                    
+                    if(!hasFetchedAddress) {
+                        lokasiText.innerText = `${currentLat}, ${currentLon} | Menerjemahkan alamat...`;
+                        
+                        // Memanggil API OpenStreetMap untuk menerjemahkan koordinat
+                        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLon}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if(data && data.address) {
+                                    // Mengambil nama jalan, kecamatan, atau kota
+                                    const jalan = data.address.road || "";
+                                    const wilayah = data.address.suburb || data.address.village || data.address.city || "";
+                                    namaLokasi = `${jalan}${jalan && wilayah ? ', ' : ''}${wilayah}`;
+                                    if(namaLokasi.trim() === "") namaLokasi = "Lokasi tidak diketahui";
+                                }
+                                lokasiText.innerText = `${namaLokasi} (${currentLat}, ${currentLon})`;
+                                hasFetchedAddress = true; // Agar tidak request berkali-kali
+                            })
+                            .catch(err => {
+                                namaLokasi = "Gagal memuat alamat";
+                                lokasiText.innerText = `${currentLat}, ${currentLon}`;
+                                hasFetchedAddress = true;
+                            });
+                    } else {
+                        lokasiText.innerText = `${namaLokasi} (${currentLat}, ${currentLon})`;
+                    }
+                    
+                    snapBtn.disabled = false;
                 },
                 (error) => {
-                    lokasiText.innerText = "Gagal mengambil lokasi. Aktifkan GPS.";
-                    snapBtn.disabled = false; // Tetap aktifkan agar user bisa absen meski tanpa GPS yang akurat
+                    lokasiText.innerText = "Gagal mengambil lokasi GPS.";
+                    snapBtn.disabled = false;
                 },
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
         // 4. Proses Ambil Foto & Watermark
         snapBtn.addEventListener('click', () => {
-            // Buat canvas virtual untuk menggambar
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
@@ -221,24 +259,22 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
-            // Gambar frame dari video ke canvas
+            // Gambar frame video
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Menambahkan overlay hitam transparan di bagian bawah untuk teks
-            ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-            ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
+            // Overlay hitam di bagian bawah untuk teks
+            ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+            ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
 
-            // Menambahkan Teks Waktu dan Lokasi ke dalam foto
+            // Menambahkan Teks Waktu dan Lokasi
             ctx.fillStyle = "white";
-            ctx.font = "bold 16px Arial";
-            const timeString = `Waktu: ${waktuText.innerText}`;
-            const locString = `Lokasi: ${currentLat}, ${currentLon}`;
-            ctx.fillText(timeString, 15, canvas.height - 45);
-            ctx.fillText(locString, 15, canvas.height - 20);
+            ctx.font = "16px Arial";
+            ctx.fillText(`⏰ ${waktuText.innerText}`, 15, canvas.height - 65);
+            ctx.fillText(`📍 ${namaLokasi}`, 15, canvas.height - 40);
+            ctx.fillText(`   ${currentLat}, ${currentLon}`, 15, canvas.height - 15);
 
-            // Menambahkan Logo ke dalam foto (Pojok Kanan Bawah)
-            // Pastikan logo sudah ter-load (menggunakan elemen img dari header)
-            const logoTargetWidth = 80; // Lebar logo di dalam foto
+            // Menambahkan Logo di Pojok Kanan Bawah
+            const logoTargetWidth = 90; 
             const aspectRatio = sourceLogo.naturalWidth / sourceLogo.naturalHeight;
             const logoTargetHeight = logoTargetWidth / aspectRatio;
             
@@ -247,14 +283,11 @@
             
             ctx.drawImage(sourceLogo, logoX, logoY, logoTargetWidth, logoTargetHeight);
 
-            // Konversi canvas menjadi gambar data base64
-            const finalImageUrl = canvas.toDataURL('image/png');
-
-            // Tampilkan hasil
+            // Render hasil
+            const finalImageUrl = canvas.toDataURL('image/jpeg', 0.9);
             photoDisplay.src = finalImageUrl;
             resultContainer.style.display = 'block';
 
-            // Opsional: Gulir layar ke bawah untuk melihat hasil
             resultContainer.scrollIntoView({ behavior: 'smooth' });
         });
     </script>
