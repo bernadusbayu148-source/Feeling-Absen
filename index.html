@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi Digital</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Absensi Kehadiran</h2>
+        
+        <!-- Preview Kamera -->
+        <video id="video" width="100%" autoplay playsinline></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        
+        <div class="info-section">
+            <p id="status-lokasi">Mencari lokasi...</p>
+            <p id="timestamp"></p>
+        </div>
+
+        <button id="snap">Ambil Foto & Absen</button>
+        
+        <div id="result" class="result-container">
+            <h3>Hasil Absensi:</h3>
+            <img id="photo" src="" alt="Foto Absen">
+            <pre id="log-data"></pre>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
